@@ -15,14 +15,17 @@
 **************************************************************/
 
 
-#include <stdlib.h>
+
+ #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdio.h>
 #include <string.h>
+
 #include "fsLow.h"
 #include "mfs.h"
 
+// Define the VCB structure
 typedef struct volumeControlBlock {
     char volumeName[32];
     uint64_t signature;
@@ -30,29 +33,31 @@ typedef struct volumeControlBlock {
     uint32_t blockSize;
     uint32_t freeBlocks;
     uint32_t rootDirectory;
+    uint32_t freeSpaceStart;
 } VCB;
 
+// Define constants
+#define ROOT_DIR_BLOCK 2
+#define FREE_SPACE_BLOCK 1
+#define VCB_BLOCK 0
+#define MY_SIGNATURE 0x415415415  // Use your custom signature
+
 int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
-    printf("Initializing File System with %ld blocks and block size of %ld bytes\n", numberOfBlocks, blockSize);
+    printf("Initializing File System with %ld blocks and block size of %ld bytes\n", 
+           numberOfBlocks, blockSize);
 
-    if (startPartitionSystem("volume.dat", &numberOfBlocks, &blockSize) != 0) {
-        printf("Failed to initialize partition system.\n");
-        return -1;
-    }
-
-    VCB vcb = {0};
+    VCB vcb = {0};  // Initialize VCB structure
     strcpy(vcb.volumeName, "MyVolume");
-    vcb.signature = 0x41504141;  // Example signature
+    vcb.signature = MY_SIGNATURE;
     vcb.totalBlocks = numberOfBlocks;
     vcb.blockSize = blockSize;
-    vcb.freeBlocks = numberOfBlocks - 1;
-    vcb.rootDirectory = 1;
+    vcb.freeBlocks = numberOfBlocks - 3;
+    vcb.rootDirectory = ROOT_DIR_BLOCK;
+    vcb.freeSpaceStart = FREE_SPACE_BLOCK;
 
     printf("Writing VCB to the first block...\n");
-    uint64_t blocksWritten = LBAwrite(&vcb, 1, 0);
-    if (blocksWritten != 1) {
-        printf("Error writing VCB to disk. Blocks written: %ld\n", blocksWritten);
-        perror("LBAwrite failed");  // Print detailed error information
+    if (LBAwrite(&vcb, 1, VCB_BLOCK) != 1) {
+        printf("Error writing VCB to disk. Blocks written: 0\n");
         return -1;
     }
 
@@ -62,19 +67,4 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
 
 void exitFileSystem() {
     printf("System exiting\n");
-    closePartitionSystem();
-}
-
-int main() {
-    uint64_t totalBlocks = 20000;
-    uint64_t blockSize = 512;
-
-    if (initFileSystem(totalBlocks, blockSize) == 0) {
-        printf("Initialization completed successfully.\n");
-    } else {
-        printf("Initialization failed.\n");
-    }
-
-    exitFileSystem();
-    return 0;
 }
