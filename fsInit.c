@@ -46,13 +46,21 @@ typedef struct DirEntry {
 #define MY_SIGNATURE 0x415415415ULL  // Note the ULL suffix
 
 // Function prototypes
-int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize);    
-// return int. (success or failure?)
-// initFileSystem: initializes file system.
-// 2 arguments: numberOfBlocks and blockSize (size of each block)
-// numberOfBlocks: number of 'cells' in memory.
-// blockSize: size of each block (in bytes, defined as an unsigned 64 bit int)
+/* initFileSystem: initializes file system, given 2 arguments: it allocates space for the file system to 
+ be stored by creating and iniitializing the Volume Control Block (VCB), writing it to block 0 on disk.
+ Also initializes free-space bitmap. Finally, creates the root directories '.' and '..'
+ 2 arguments: numberOfBlocks and blockSize (size of each block)
+ numberOfBlocks: number of 'cells' in memory.
+ blockSize: size of each block (in bytes, defined as an unsigned 64 bit int)
+ 
+ Returns: int (success or failure?)
+*/
+int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize);
+/* exitFileSystem
+
+*/
 void exitFileSystem(void);
+
 static void initRootDirectory(void);
 static void initFreeSpace(uint64_t numberOfBlocks);
 
