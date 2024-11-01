@@ -132,7 +132,7 @@ static void initFreeSpace(uint64_t numberOfBlocks) {
 
    // Clear bitmap and mark first 8 blocks as used (VCB, 5 bitmap, 6 root)
    memset(bitmap, 0, 5 * vcbPtr->blockSize);
-   for (int i = 0; i < 8; i++) {
+   for (int i = 0; i < 12; i++) {
        bitmap[i / 8] |= (1 << (i % 8));
    }
 
