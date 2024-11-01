@@ -31,9 +31,9 @@ typedef struct volumeControlBlock {
 } __attribute__((packed)) VCB;
 
 // Directory entry structure
-typedef struct {
+typedef struct DirEntry {
    char name[32];
-   uint32_t size;
+   uint32_t size;       // implies how many blocks used for storing file.
    uint32_t block;
    uint8_t isDirectory;
    uint8_t padding[23];
@@ -46,7 +46,12 @@ typedef struct {
 #define MY_SIGNATURE 0x415415415ULL  // Note the ULL suffix
 
 // Function prototypes
-int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize);
+int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize);    
+// return int. (success or failure?)
+// initFileSystem: initializes file system.
+// 2 arguments: numberOfBlocks and blockSize (size of each block)
+// numberOfBlocks: number of 'cells' in memory.
+// blockSize: size of each block (in bytes, defined as an unsigned 64 bit int)
 void exitFileSystem(void);
 static void initRootDirectory(void);
 static void initFreeSpace(uint64_t numberOfBlocks);
