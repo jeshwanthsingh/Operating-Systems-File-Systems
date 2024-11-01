@@ -79,6 +79,15 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
    }
    memset(vcbPtr, 0, blockSize);
 
+   //Check if the Volume is already Initialized
+   if (LBAread(vcbPtr, 1, 0) != 1){
+       printf("Failed to read block 0\n");
+   }
+   //Check if signature matches
+   if (vcbPtr->signature == MY_SIGNATURE){
+       printf("Signature match found, Volume already initialized\n");
+   }
+
    // Initialize VCB
    vcbPtr->signature = MY_SIGNATURE;
    strncpy(vcbPtr->volumeName, "MyVolume", 31);
