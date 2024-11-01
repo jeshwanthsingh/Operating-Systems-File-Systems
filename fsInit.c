@@ -90,14 +90,14 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
    strncpy(vcbPtr->volumeName, "MyVolume", 31);
    vcbPtr->totalBlocks = numberOfBlocks;
    vcbPtr->blockSize = blockSize;
-   vcbPtr->freeBlocks = numberOfBlocks - 8;  // Subtract VCB, 5 bitmap blocks, and 6 root directory blocks
+   vcbPtr->freeBlocks = numberOfBlocks - 12;  // Subtract VCB, 5 bitmap blocks, and 6 root directory blocks
    vcbPtr->freeSpaceStart = FREE_SPACE_BLOCK;
 
    // Initialize and write the free space bitmap (5 blocks)
    initFreeSpace(numberOfBlocks);
 
    // Dynamically request 6 blocks for root directory and update VCB
-   vcbPtr->rootDirectory = allocateBlocks(6);  // Request 6 blocks from free space system
+   vcbPtr->rootDirectory = 6;  // Request 6 blocks from free space system
    if (vcbPtr->rootDirectory == 0) {
        printf("Failed to allocate blocks for root directory\n");
        free(vcbPtr);
