@@ -13,6 +13,8 @@
 #include "mfs.h"
 #include "fsFreespace.h"
 #include "fsLow.h"
+#include <stdlib.h> // for malloc and free
+#include <string.h> // for memset
 #define CHARSIZE 8 		// Number for the 8 bits in an unsigned char
 #define TOTAL_FREE_SPACE 2560 	//Total bytes for free space
 #define FREE_SPACE_LIMIT CHARSIZE*TOTAL_FREE_SPACE
@@ -21,7 +23,7 @@
 
 int freeSpaceLocation = 0;	// Number that signifies beginning of free space
 int numSpace = 0;
-uint8_t *freeSpaceMap;
+uint8_t *freeSpaceMap = NULL;
 
 void initFreeSpace() {
     // Allocate 5 blocks for the bitmap

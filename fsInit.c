@@ -17,7 +17,7 @@
 
 #include "fsLow.h"
 #include "mfs.h"
-#include "fsFreespace.c"
+#include "fsFreespace.h"
 #include "parsePath.h"
 
 

@@ -186,23 +186,25 @@ int fs_closedir(fdDir *dirp){
     return 0;
 }
 
-struct fs_diriteminfo *fs_readdir(fdDir *dirp){
-    printf("\n---Read Directory---\n");
-    fs_diriteminfo* newInfo;
-    newInfo = malloc(sizeof(fs_diriteminfo));
-    int numEntries = dirp->directory->size/sizeof(DirEntry);
-    if (dirp->dirEntryPosition==numEntries){
-        newInfo = NULL;
-        return newInfo;
+struct fs_diriteminfo* fs_readdir(fdDir* dirp) {
+    fs_diriteminfo* newInfo = malloc(sizeof(fs_diriteminfo));
+    int numEntries = dirp->directory[0].size / sizeof(DirEntry);
+    
+    if (dirp->dirEntryPosition >= numEntries) {
+        free(newInfo);
+        return NULL;
     }
-    if (dirp->directory[dirp->dirEntryPosition].isUsed==0){
-        newInfo = NULL;
-        return newInfo;
+    
+    if (!dirp->directory[dirp->dirEntryPosition].isUsed) {
+        free(newInfo);
+        return NULL;
     }
-    strcpy(newInfo->d_name,dirp->directory[dirp->dirEntryPosition].dirName);
+    
+    strcpy(newInfo->d_name, dirp->directory[dirp->dirEntryPosition].name);
     newInfo->d_reclen = dirp->directory[dirp->dirEntryPosition].size;
     newInfo->fileType = dirp->directory[dirp->dirEntryPosition].isDirectory;
-    dirp->dirEntryPosition = dirp->dirEntryPosition + 1;
+    
+    dirp->dirEntryPosition++;
     return newInfo;
 }
 
@@ -262,15 +264,20 @@ DirEntry* createDir(int numEntries, DirEntry* parent, char* name){
     return new;
 }
 
-void writeDir(DirEntry* dir){
-    int blocks = (dir[0].size+BLOCK_SIZE-1)/BLOCK_SIZE;
-    //printf("the dirname is %s and %s, blocks %d and number %d\n",dir[0].name,dir[0].dirName,blocks,dir[0].block);
-    if (LBAwrite(dir,blocks,dir[0].block)!=blocks){
-        printf("Couldn't write to disk\n");
-        return;
+int writeDir(DirEntry* dir) {
+    if (dir == NULL) {
+        printf("Error: NULL directory pointer\n");
+        return -1;
     }
-    //printf("Written to disk successfully\n");
-    return;
+
+    int blocks = (dir[0].size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    int result = LBAwrite(dir, blocks, dir[0].block);
+    if (result != blocks) {
+        printf("Error: LBAwrite failed. Wrote %d blocks, expected %d\n", result, blocks);
+        return -1;
+    }
+
+    return 0;
 }
 
 

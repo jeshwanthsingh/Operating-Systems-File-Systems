@@ -15,6 +15,7 @@
 #ifndef _B_IO_H
 #define _B_IO_H
 #include <fcntl.h>
+#define B_CHUNK_SIZE 512
 
 typedef int b_io_fd;
 

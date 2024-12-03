@@ -7,10 +7,17 @@
 *
 * Description:: Header file for freesspace.c of the filesystem
 **************************************************************/
+#ifndef FS_FREESPACE_H
+#define FS_FREESPACE_H
+
+extern int freeSpaceLocation;
+extern int numSpace;
+extern uint8_t *freeSpaceMap;
 
 void initFreeSpace();
-//int increaseSpace();
 void loadFreeSpace();
 int findFreeBlocks(int numOfBlocks);
 void releaseSpace(int entryLocation, int numBlocks);
 int checkFree(int blockNumber);
+
+#endif // FS_FREESPACE_H

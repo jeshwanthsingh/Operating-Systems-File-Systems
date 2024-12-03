@@ -26,7 +26,7 @@
 #include <string.h>
 
 #include "fsLow.h"
-#include "mfs.c"
+#include "mfs.h"
 #include "parsePath.h"
 
 #define PERMISSIONS (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
@@ -38,16 +38,16 @@
 
 /****   SET THESE TO 1 WHEN READY TO TEST THAT COMMAND ****/
 #define CMDLS_ON	1
-#define CMDCP_ON	0
-#define CMDMV_ON	0
+#define CMDCP_ON	1
+#define CMDMV_ON	1
 #define CMDMD_ON	1
 #define CMDRM_ON	1
-#define CMDCP2L_ON	0
-#define CMDCP2FS_ON	0
+#define CMDCP2L_ON	1
+#define CMDCP2FS_ON	1
 #define CMDCD_ON	1
 #define CMDPWD_ON	1
-#define CMDTOUCH_ON	0
-#define CMDCAT_ON	0
+#define CMDTOUCH_ON	1
+#define CMDCAT_ON	1
 
 
 typedef struct dispatch_t
@@ -269,45 +269,38 @@ int cmd_touch (int argcnt, char *argvec[])
 * Cat Command
 ***************************************************/
 
-int cmd_cat (int argcnt, char *argvec[])
-        {
-#if (CMDCAT_ON == 1)     
-        int testfs_src_fd;
-        char * src;
-        int readcnt;
-        char buf[BUFFERLEN];
+int cmd_cat(int argcnt, char *argvec[]) {
+    printf("\n--- Cat command: %s ---\n", argvec[1]);
+    
+    if (argcnt != 2) {
+        printf("Usage: cat filename\n");
+        return -1;
+    }
 
-        switch (argcnt)
-                {
-                case 2: //only one name provided
-                        src = argvec[1];
-                        break;
+    int fd = b_open(argvec[1], O_RDONLY);
+    if (fd < 0) {
+        printf("Error: Could not open file %s\n", argvec[1]);
+        return -1;
+    }
 
-                default:
-                        printf("Usage: cat srcfile\n");
-                        return (-1);
-                }
+    char buffer[BUFFERLEN];  // Using BUFFERLEN instead of B_CHUNK_SIZE
+    int bytesRead;
+    int totalRead = 0;
 
+    while ((bytesRead = b_read(fd, buffer, BUFFERLEN - 1)) > 0) {
+        buffer[bytesRead] = '\0';
+        printf("%s", buffer);
+        totalRead += bytesRead;
+    }
 
-        testfs_src_fd = b_open (src, O_RDONLY);
+    if (totalRead > 0) {
+        printf("\n");
+    }
 
-        if (testfs_src_fd < 0)
-            {
-	    printf ("Failed to open file system file: %s\n", src);
-            return (testfs_src_fd);
-            }
-
-
-        do 
-                {
-                readcnt = b_read (testfs_src_fd, buf, BUFFERLEN-1);
-                buf[readcnt] = '\0';
-                printf("%s", buf);
-                } while (readcnt == BUFFERLEN-1);
-        b_close (testfs_src_fd);
-#endif
-        return 0;
-        }
+    printf("Total bytes read: %d\n", totalRead);
+    b_close(fd);
+    return 0;
+}
 
 
 

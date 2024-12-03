@@ -42,8 +42,7 @@ CC=gcc
 CFLAGS= -g -I.
 LIBS =pthread
 DEPS = 
-# Add any additional objects to this list
-ADDOBJ= fsInit.o
+ADDOBJ= fsInit.o b_io.o mfs.o fsFreespace.o
 ARCH = $(shell uname -m)
 
 ifeq ($(ARCH), aarch64)
@@ -55,18 +54,16 @@ endif
 OBJ = $(ROOTNAME)$(HW)$(FOPTION).o $(ADDOBJ) $(ARCHOBJ)
 
 %.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS) 
+	$(CC) -c -o $@ $< $(CFLAGS)
 
 $(ROOTNAME)$(HW)$(FOPTION): $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) -lm -l readline -l $(LIBS)
 
 clean:
-	rm $(ROOTNAME)$(HW)$(FOPTION).o $(ADDOBJ) $(ROOTNAME)$(HW)$(FOPTION)
+	rm -f $(ROOTNAME)$(HW)$(FOPTION).o $(ADDOBJ) $(ROOTNAME)$(HW)$(FOPTION)
 
 run: $(ROOTNAME)$(HW)$(FOPTION)
 	./$(ROOTNAME)$(HW)$(FOPTION) $(RUNOPTIONS)
 
 vrun: $(ROOTNAME)$(HW)$(FOPTION)
 	valgrind ./$(ROOTNAME)$(HW)$(FOPTION) $(RUNOPTIONS)
-
-

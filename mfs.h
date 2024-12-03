@@ -124,7 +124,7 @@ extern DirEntry* root;
 extern DirEntry* cwd;
 //to be changed
 DirEntry* createDir(int numEntries, DirEntry* parent, char* name);
-void writeDir(DirEntry* dir);
+int writeDir(DirEntry* dir);
 DirEntry* loadDirectory(DirEntry* entry);
 int FindInDirectory(DirEntry* dir, char* name);
 void FreeDir(DirEntry* dir);
