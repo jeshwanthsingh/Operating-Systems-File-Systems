@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <time.h>
+#include <stdint.h>
 
 #include "b_io.h"
 
@@ -36,14 +37,28 @@ typedef u_int64_t uint64_t;
 typedef u_int32_t uint32_t;
 #endif
 
+#define NUM_OF_ENTRIES 51;
+
+
+//Our Directory entry structure
+typedef struct {
+   char name[24];
+   char dirName[24];
+   uint32_t size;
+   uint32_t block;
+   uint8_t isDirectory;
+   uint8_t isUsed; 
+} DirEntry;
+
+
 // This structure is returned by fs_readdir to provide the caller with information
 // about each file as it iterates through a directory
-struct fs_diriteminfo
+typedef struct fs_diriteminfo
 	{
     unsigned short d_reclen;    /* length of this record */
     unsigned char fileType;    
     char d_name[256]; 			/* filename max filename is 255 characters */
-	};
+	} fs_diriteminfo;
 
 // This is a private structure used only by fs_opendir, fs_readdir, and fs_closedir
 // Think of this like a file descriptor but for a directory - one can only read
@@ -55,8 +70,9 @@ typedef struct
 	/*****TO DO:  Fill in this structure with what your open/read directory needs  *****/
 	unsigned short  d_reclen;		/* length of this record */
 	unsigned short	dirEntryPosition;	/* which directory entry position, like file pos */
-	//DE *	directory;			/* Pointer to the loaded directory you want to iterate */
-	struct fs_diriteminfo * di;		/* Pointer to the structure you return from read */
+	DirEntry *	directory;			/* Pointer to the loaded directory you want to iterate */
+	uint32_t startingBlock;			/* The starting LBA of the directory*/
+	//struct fs_diriteminfo * di;		/* Pointer to the structure you return from read */
 	} fdDir;
 
 // Key directory functions
@@ -82,14 +98,37 @@ struct fs_stat
 	off_t     st_size;    		/* total size, in bytes */
 	blksize_t st_blksize; 		/* blocksize for file system I/O */
 	blkcnt_t  st_blocks;  		/* number of 512B blocks allocated */
-	time_t    st_accesstime;   	/* time of last access */
-	time_t    st_modtime;   	/* time of last modification */
-	time_t    st_createtime;   	/* time of last status change */
+	//time_t    st_accesstime;   	/* time of last access */
+	//time_t    st_modtime;   	/* time of last modification */
+	//time_t    st_createtime;   	/* time of last status change */
 	
 	/* add additional attributes here for your file system */
 	};
 
 int fs_stat(const char *path, struct fs_stat *buf);
 
-#endif
+// Define the VCB structure
+typedef struct volumeControlBlock {
+   uint64_t signature;          
+   char volumeName[32];         
+   uint32_t totalBlocks;
+   uint32_t blockSize;
+   uint32_t freeBlocks;
+   uint32_t rootDirectory;
+   uint32_t freeSpaceStart;
+   uint8_t padding[452];        
+} __attribute__((packed)) VCB;
 
+//Global variables for root and cwd
+extern DirEntry* root;
+extern DirEntry* cwd;
+//to be changed
+DirEntry* createDir(int numEntries, DirEntry* parent, char* name);
+void writeDir(DirEntry* dir);
+DirEntry* loadDirectory(DirEntry* entry);
+int FindInDirectory(DirEntry* dir, char* name);
+void FreeDir(DirEntry* dir);
+int DirEntryUsed(DirEntry* entry);
+static VCB* vcbPtr = NULL;
+
+#endif

@@ -1,5 +1,5 @@
 /**************************************************************
-* Class::  CSC-415-0# Spring 2024
+* Class::  CSC-415-04 Spring 2024
 * GitHub-Name:: jeshwanthsingh
 * Project:: Basic File System
 *
@@ -17,30 +17,15 @@
 
 #include "fsLow.h"
 #include "mfs.h"
+#include "fsFreespace.c"
+#include "parsePath.h"
 
-// Define the VCB structure
-typedef struct volumeControlBlock {
-   uint64_t signature;          
-   char volumeName[32];         
-   uint32_t totalBlocks;
-   uint32_t blockSize;
-   uint32_t freeBlocks;
-   uint32_t rootDirectory;
-   uint32_t freeSpaceStart;
-   uint8_t padding[452];        
-} __attribute__((packed)) VCB;
 
-typedef struct {
-   char name[32];
-   uint32_t size;
-   uint32_t block;
-   uint8_t isDirectory;
-   uint8_t padding[23];
-} DirEntry;
 
-#define ROOT_DIR_BLOCK 2
+#define ROOT_DIR_BLOCK 6
 #define FREE_SPACE_BLOCK 1
 #define VCB_BLOCK 0
+#define DIR_ENTRY_BLOCKS 6
 #define MY_SIGNATURE 0x415415415ULL  
 
 // Function prototypes
@@ -57,15 +42,19 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize);
 //exit file system
 void exitFileSystem(void);
 static void initRootDirectory(void);
-static void initFreeSpace(uint64_t numberOfBlocks);
 
 //Global VCB pointer
-static VCB* vcbPtr = NULL;
+//static VCB* vcbPtr = NULL;
+//Global cwd and root pointer
+DirEntry * cwd = NULL;
+DirEntry * root = NULL;
 
 int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
    printf("Initializing File System with %ld blocks and block size of %ld bytes\n", 
           numberOfBlocks, blockSize);
 
+   printf("The size of Directory is %lu bytes\n", sizeof(DirEntry));
+   
    // Allocate and clear VCB
    vcbPtr = (VCB*)malloc(blockSize);
    if (!vcbPtr) {
@@ -82,6 +71,11 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
    // Check if signature matches
    if (vcbPtr->signature == MY_SIGNATURE) {
        printf("Signature match found, Volume already initialized\n");
+       loadFreeSpace();
+       root = malloc(DIR_ENTRY_BLOCKS * vcbPtr->blockSize);
+       LBAread(root, DIR_ENTRY_BLOCKS, ROOT_DIR_BLOCK);
+       cwd = root;
+       printf("The name of the root directory is %s \n", root[0].name);
        return 0; // Volume is already initialized
    }
 
@@ -90,19 +84,25 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
    strncpy(vcbPtr->volumeName, "MyVolume", 31);
    vcbPtr->totalBlocks = numberOfBlocks;
    vcbPtr->blockSize = blockSize;
-   vcbPtr->freeBlocks = numberOfBlocks - 12;  // Subtract VCB, 5 bitmap blocks, and 6 root directory blocks
-   vcbPtr->freeSpaceStart = FREE_SPACE_BLOCK;
 
    // Initialize and write the free space bitmap (5 blocks)
-   initFreeSpace(numberOfBlocks);
+   initFreeSpace();
+   vcbPtr->freeSpaceStart = FREE_SPACE_BLOCK;
+   vcbPtr->freeBlocks = numberOfBlocks - 6;  // Subtract VCB, 5 bitmap blocks
 
    // Dynamically request 6 blocks for root directory and update VCB
-   vcbPtr->rootDirectory = 6;  // Request 6 blocks from free space system
+   vcbPtr->rootDirectory = findFreeBlocks(6);  // Request 6 blocks from free space system
+   printf("The starting of rootDirectory is %d\n",vcbPtr->rootDirectory);
+
    if (vcbPtr->rootDirectory == 0) {
        printf("Failed to allocate blocks for root directory\n");
        free(vcbPtr);
        return -1;
    }
+   
+   // Initialize root directory in the allocated blocks
+   initRootDirectory();
+   vcbPtr->freeBlocks = vcbPtr->freeBlocks - 6; //subtracting root directory blocks
 
    // Write VCB to block 0
    printf("Writing VCB to block %d...\n", VCB_BLOCK);
@@ -115,71 +115,58 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
    printf("VCB Verification:\n");
    printf("- Signature: 0x%llx\n", (unsigned long long)vcbPtr->signature);
 
-   // Initialize root directory in the allocated blocks
-   initRootDirectory();
-
    printf("File system initialized successfully!\n");
    return 0;
 }
 
-static void initFreeSpace(uint64_t numberOfBlocks) {
-   // Allocate 5 blocks for the bitmap
-   uint8_t* bitmap = (uint8_t*)malloc(5 * vcbPtr->blockSize);
-   if (!bitmap) {
-       printf("Failed to allocate bitmap\n");
-       return;
-   }
-
-   // Clear bitmap and mark first 8 blocks as used (VCB, 5 bitmap, 6 root)
-   memset(bitmap, 0, 5 * vcbPtr->blockSize);
-   for (int i = 0; i < 12; i++) {
-       bitmap[i / 8] |= (1 << (i % 8));
-   }
-
-   // Write bitmap to disk (5 blocks starting from block 1)
-   printf("Writing free space bitmap to block %d...\n", FREE_SPACE_BLOCK);
-   if (LBAwrite(bitmap, 5, FREE_SPACE_BLOCK) != 5) {
-       printf("Error writing bitmap\n");
-       free(bitmap);
-       return;
-   }
-
-   free(bitmap);
-   printf("Free space bitmap initialized\n");
-}
-
 static void initRootDirectory(void) {
    // Allocate memory for the root directory (6 blocks)
-   DirEntry* rootDir = (DirEntry*)malloc(6 * vcbPtr->blockSize);
-   if (!rootDir) {
+   root = malloc(DIR_ENTRY_BLOCKS * vcbPtr->blockSize);
+   if (!root) {
        printf("Failed to allocate root directory\n");
        return;
    }
 
    // Clear directory block
-   memset(rootDir, 0, 6 * vcbPtr->blockSize);
+   memset(root, 0, DIR_ENTRY_BLOCKS * vcbPtr->blockSize);
+
+   //set directories to free
+   int numEntries = (DIR_ENTRY_BLOCKS*vcbPtr->blockSize)/sizeof(DirEntry);
+   for (int i = 2; i < numEntries; i++){
+        root[i].isUsed = 0;
+   }
 
    // Create "." entry
-   strncpy(rootDir[0].name, ".", 1);
-   rootDir[0].size = 6 * vcbPtr->blockSize;  // Set to total directory block size
-   rootDir[0].block = vcbPtr->rootDirectory;
-   rootDir[0].isDirectory = 1;
+   strcpy(root[0].dirName, "/");
+   strncpy(root[0].name, ".", 1);
+   root[0].size = DIR_ENTRY_BLOCKS * vcbPtr->blockSize;  // Set to total directory block size
+   root[0].block = vcbPtr->rootDirectory;
+   root[0].isDirectory = 1;
+   root[0].isUsed = 1;
 
    // Create ".." entry (same as "." for root)
-   strncpy(rootDir[1].name, "..", 2);
-   rootDir[1].size = 6 * vcbPtr->blockSize;
-   rootDir[1].block = vcbPtr->rootDirectory;
-   rootDir[1].isDirectory = 1;
+   strcpy(root[1].dirName, "/");
+   strncpy(root[1].name, "..", 2);
+   root[1].size = DIR_ENTRY_BLOCKS * vcbPtr->blockSize;
+   root[1].block = vcbPtr->rootDirectory;
+   root[1].isDirectory = 1;
+   root[1].isUsed = 1;
+
+   //memcpy(rootDir, cwd, sizeof(DirEntry));
+   //memcpy(rootDir, root, sizeof(DirEntry));
+   cwd = root;
+   //strncpy(root[0].name, "f", 1);
+   printf("The name of the root directory is %s", root[0].dirName);
 
    // Write root directory (6 blocks starting from vcbPtr->rootDirectory)
    printf("Writing root directory to block %d...\n", vcbPtr->rootDirectory);
-   if (LBAwrite(rootDir, 6, vcbPtr->rootDirectory) != 6) {
+   if (LBAwrite(root, DIR_ENTRY_BLOCKS, vcbPtr->rootDirectory) != DIR_ENTRY_BLOCKS) {
        printf("Error writing root directory\n");
-       free(rootDir);
+       free(root);
        return;
    }
 
-   free(rootDir);
+   //free(rootDir);
    printf("Root directory initialized\n");
 }
 
@@ -188,7 +175,13 @@ void exitFileSystem() {
    if (vcbPtr) {
        printf("Writing final VCB state...\n");
        LBAwrite(vcbPtr, 1, VCB_BLOCK);
+       LBAwrite(freeSpaceMap, 5, FREE_SPACE_BLOCK);
        free(vcbPtr);
+       free(freeSpaceMap);
+       free(root);
+       //free(cwd);
+       root = NULL;
+       cwd = NULL;
        vcbPtr = NULL;
    }
 
