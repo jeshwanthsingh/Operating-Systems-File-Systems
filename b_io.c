@@ -132,7 +132,7 @@ b_io_fd b_open(char* filename, int flags) {
         // Allocate block for new file
         DirEntry* newFile;
         int numEntries = B_CHUNK_SIZE/sizeof(DirEntry);
-        printf("The number of entries is %d\n",numEntries);
+        //printf("The number of entries is %d\n",numEntries);
         newFile = createDir(numEntries,parent,filename);
         //int newBlock = findFreeBlocks(1);
         /*
@@ -144,17 +144,17 @@ b_io_fd b_open(char* filename, int flags) {
         */
 
         // Initialize new entry in parent
-        printf("The file is created in parent %s at index %d\n",parent[0].dirName,newIndex);
+        //printf("The file is created in parent %s at index %d\n",parent[0].dirName,newIndex);
         parent[newIndex].isUsed = 1;
         parent[newIndex].isDirectory = 0;
         parent[newIndex].size = B_CHUNK_SIZE;
-        printf("size allocation is okay\n");
+        //printf("size allocation is okay\n");
         parent[newIndex].block = newFile[0].block;
         strcpy(parent[newIndex].name, lastElem);
         strcpy(parent[newIndex].dirName, lastElem);
 
         // Write directory once for new file
-        printf("Writing parent to disk\n");
+        //printf("Writing parent to disk\n");
         if(writeDir(parent)!=0){
             printf("Write Dir Failed");
         };

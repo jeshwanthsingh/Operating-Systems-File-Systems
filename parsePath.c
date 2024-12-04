@@ -15,7 +15,7 @@
 //#include <stdio.h>
 
 // Logging macros for better control
-#define LOG_LEVEL 3 // 0 - No Logs, 1 - Errors only, 2 - Info, 3 - Debug
+#define LOG_LEVEL 1 // 0 - No Logs, 1 - Errors only, 2 - Info, 3 - Debug
 
 #define LOG_ERROR(fmt, ...) if (LOG_LEVEL >= 1) printf("[ERROR] " fmt "\n", ##__VA_ARGS__)
 #define LOG_INFO(fmt, ...) if (LOG_LEVEL >= 2) printf("[INFO] " fmt "\n", ##__VA_ARGS__)

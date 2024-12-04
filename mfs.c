@@ -195,14 +195,14 @@ struct fs_diriteminfo* fs_readdir(fdDir* dirp) {
     fs_diriteminfo* newInfo = malloc(sizeof(fs_diriteminfo));
     int numEntries = dirp->directory[0].size / sizeof(DirEntry);
     
+    while (dirp->dirEntryPosition < numEntries && !dirp->directory[dirp->dirEntryPosition].isUsed) {
+        dirp->dirEntryPosition = dirp->dirEntryPosition+1;
+    }
+
     if (dirp->dirEntryPosition >= numEntries) {
         newInfo = NULL;
         free(newInfo);
         return NULL;
-    }
-    
-    while (dirp->dirEntryPosition < numEntries && !dirp->directory[dirp->dirEntryPosition].isUsed) {
-        dirp->dirEntryPosition = dirp->dirEntryPosition+1;
     }
     
     strcpy(newInfo->d_name, dirp->directory[dirp->dirEntryPosition].name);
@@ -226,9 +226,11 @@ int fs_stat(const char *pathname, struct fs_stat *buf){
         printf("error parsing path\n");
         return -1;
     }
-	
+	if (index == -1){
+        printf("No such file or directory found\n");
+    }
 	buf->st_size = retParent[index].size;
-	buf->st_blksize = vcbPtr->blockSize;
+	buf->st_blksize = BLOCK_SIZE;
 	buf->st_blocks = (retParent[index].size+BLOCK_SIZE-1)/BLOCK_SIZE;;
 	return 0; 
 }
