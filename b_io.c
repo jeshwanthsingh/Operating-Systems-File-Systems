@@ -96,8 +96,7 @@ b_io_fd b_open(char* filename, int flags) {
     fcbArray[fd].isDirty = 0;
     fcbArray[fd].filePosition = 0;
 
-    // Use cwd as starting point
-    DirEntry* parent = cwd;
+    DirEntry* parent;
     int index;
     char* lastElem;
 
@@ -115,9 +114,9 @@ b_io_fd b_open(char* filename, int flags) {
 
         // Find free entry
         int newIndex = -1;
-        int numEntries = parent[0].size / sizeof(DirEntry);
+        int numParentEntries = parent[0].size / sizeof(DirEntry);
 
-        for (int i = 2; i < numEntries; i++) {
+        for (int i = 2; i < numParentEntries; i++) {
             if (!parent[i].isUsed) {
                 newIndex = i;
                 break;
@@ -129,23 +128,38 @@ b_io_fd b_open(char* filename, int flags) {
             return -1;
         }
 
+        printf("---Creating the file %s---\n",filename);
         // Allocate block for new file
-        int newBlock = findFreeBlocks(1);
+        DirEntry* newFile;
+        int numEntries = B_CHUNK_SIZE/sizeof(DirEntry);
+        printf("The number of entries is %d\n",numEntries);
+        newFile = createDir(numEntries,parent,filename);
+        //int newBlock = findFreeBlocks(1);
+        /*
+        printf("free space found at %d\n",newBlock);
         if (newBlock == -1) {
             fcbArray[fd].isUsed = 0;  // No free blocks available
             return -1;
         }
+        */
 
-        // Initialize new entry
+        // Initialize new entry in parent
+        printf("The file is created in parent %s at index %d\n",parent[0].dirName,newIndex);
         parent[newIndex].isUsed = 1;
         parent[newIndex].isDirectory = 0;
-        parent[newIndex].size = 0;
-        parent[newIndex].block = newBlock;
-        strncpy(parent[newIndex].name, lastElem, sizeof(parent[newIndex].name) - 1);
-        strncpy(parent[newIndex].dirName, lastElem, sizeof(parent[newIndex].dirName) - 1);
+        parent[newIndex].size = B_CHUNK_SIZE;
+        printf("size allocation is okay\n");
+        parent[newIndex].block = newFile[0].block;
+        strcpy(parent[newIndex].name, lastElem);
+        strcpy(parent[newIndex].dirName, lastElem);
 
         // Write directory once for new file
-        writeDir(parent);
+        printf("Writing parent to disk\n");
+        if(writeDir(parent)!=0){
+            printf("Write Dir Failed");
+        };
+        free(newFile);
+        FreeDir(parent);
         index = newIndex;
     }
 
@@ -317,7 +331,7 @@ int b_close(b_io_fd fd) {
 
     // Update parent directory only if file size changed
     if (fcbArray[fd].file.size != fcbArray[fd].filePosition) {
-        DirEntry* parent = cwd;  // Start with cwd
+        DirEntry* parent;
         int index;
         char* lastElem;
 

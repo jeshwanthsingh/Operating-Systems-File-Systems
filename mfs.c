@@ -45,16 +45,16 @@ int fs_mkdir(const char *pathname, mode_t mode){
 
     //Add code for writing the directory to disk and modifying the dirEntry in parent
     int numEntries = 51;
-    //printf("Creating new directory in parent %s\n",retParent[0].dirName);
+    printf("Creating new directory in parent %s at block %d\n",retParent[0].dirName, retParent[0].block);
     DirEntry* newDirectory;
     newDirectory = createDir(numEntries, retParent, lastElementName);
-    //printf("The new directory is %s at block %d\n",newDirectory[0].name,newDirectory[0].block);
+    printf("The new directory is %s at block %d\n",newDirectory[0].name,newDirectory[0].block);
 
     //finding empty directory entry in parent
     int i;
     for (i = 2; i < numEntries; i++){
         if (retParent[i].isUsed == 0){
-            //printf("copying new Directory in index %d of parent\n",i);
+            printf("copying new Directory in index %d of parent\n",i);
             strcpy(retParent[i].name,lastElementName);
             strcpy(retParent[i].dirName,lastElementName);
             //strcpy(newDirectory[0].dirName,lastElementName);
@@ -65,10 +65,12 @@ int fs_mkdir(const char *pathname, mode_t mode){
             break;
         }        
     }
-    //printf("The new directory is %s and at %d block\n",newDirectory[0].dirName,retParent[i].block);
+    printf("The new directory is %s and at %d block\n",newDirectory[0].dirName,retParent[i].block);
     //printf("writing directories to disk\n");
     //writeDir(newDirectory);
-    writeDir(retParent);
+    if (writeDir(retParent)!=0){
+        printf("Write Directory failed");
+    }
     FreeDir(newDirectory);
     FreeDir(retParent);
     return 0;
@@ -91,7 +93,7 @@ int fs_rmdir(const char* pathname){
     //printf("The current last element is %s, and the index is %d\n", lastElementName, index);
 
     if (index==-1){
-        printf("Directory does not exist");
+        printf("Directory does not exist\n");
         return -2;
     }
 
@@ -107,7 +109,9 @@ int fs_rmdir(const char* pathname){
     int numBlocksToRelease = (dirToRemove[0].size+BLOCK_SIZE-1)/BLOCK_SIZE;
     releaseSpace(dirToRemove[0].block,numBlocksToRelease);
     retParent[index].isUsed = 0;
-    writeDir(retParent);
+    if (writeDir(retParent)!=0){
+        printf("Write Directory failed");
+    }
     FreeDir(retParent);
     FreeDir(dirToRemove);
     return 0;
@@ -128,12 +132,13 @@ int fs_isDir(char* pathname){
     }
     if (index==-1){
         printf("No such directory or file\n");
+        return -1;
     }
     int numEntries = retParent[index].size/sizeof(DirEntry);
     //printf("The directory is in parent %s, at index %d with size %d\n",retParent[index].dirName,index, retParent[index].size);
-    DirEntry* dir = loadDirectory(&retParent[index]);
+    //DirEntry* dir = loadDirectory(&retParent[index]);
     //printf("The dir is %s and %s\n",dir[0].dirName,dir[0].name);
-    return dir[0].isDirectory==1;    
+    return retParent[index].isDirectory==1;    
 }
 
 int fs_isFile(char* pathname){
@@ -181,7 +186,7 @@ fdDir * fs_opendir(const char *pathname){
 int fs_closedir(fdDir *dirp){
     printf("\n---Close Directory---\n");	
 	dirp->directory = NULL;
-	free(dirp->directory);
+	FreeDir(dirp->directory);
 	free(dirp);
     return 0;
 }
@@ -191,20 +196,20 @@ struct fs_diriteminfo* fs_readdir(fdDir* dirp) {
     int numEntries = dirp->directory[0].size / sizeof(DirEntry);
     
     if (dirp->dirEntryPosition >= numEntries) {
+        newInfo = NULL;
         free(newInfo);
         return NULL;
     }
     
-    if (!dirp->directory[dirp->dirEntryPosition].isUsed) {
-        free(newInfo);
-        return NULL;
+    while (dirp->dirEntryPosition < numEntries && !dirp->directory[dirp->dirEntryPosition].isUsed) {
+        dirp->dirEntryPosition = dirp->dirEntryPosition+1;
     }
     
     strcpy(newInfo->d_name, dirp->directory[dirp->dirEntryPosition].name);
     newInfo->d_reclen = dirp->directory[dirp->dirEntryPosition].size;
     newInfo->fileType = dirp->directory[dirp->dirEntryPosition].isDirectory;
     
-    dirp->dirEntryPosition++;
+    dirp->dirEntryPosition = dirp->dirEntryPosition+1;
     return newInfo;
 }
 
@@ -233,10 +238,10 @@ DirEntry* createDir(int numEntries, DirEntry* parent, char* name){
     int bytesNeeded = numEntries * sizeof(DirEntry);
     int blocksNeeded = (bytesNeeded+BLOCK_SIZE-1)/BLOCK_SIZE;
     int actualBytes = blocksNeeded * BLOCK_SIZE;
-    //printf("We need %d blocks for the new directory\n",blocksNeeded);
+    printf("We need %d blocks for the new directory\n",blocksNeeded);
     DirEntry* new = malloc(actualBytes);
     int loc = findFreeBlocks(blocksNeeded);
-    //printf("free blocks found from block number %d\n",loc);
+    printf("free blocks found from block number %d\n",loc);
     int actualEntries = actualBytes/sizeof(DirEntry);
 
     //Initialize
@@ -260,7 +265,9 @@ DirEntry* createDir(int numEntries, DirEntry* parent, char* name){
     new[1].isDirectory = parent[0].isDirectory;
     new[1].isUsed = 1;
 
-    writeDir(new);
+    if (writeDir(new)!=0){
+        printf("Write Directory failed");
+    };
     return new;
 }
 
@@ -271,6 +278,9 @@ int writeDir(DirEntry* dir) {
     }
 
     int blocks = (dir[0].size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    if (dir[0].isDirectory==0){
+        blocks = FILE_ENTRY_BLOCKS;
+    }
     int result = LBAwrite(dir, blocks, dir[0].block);
     if (result != blocks) {
         printf("Error: LBAwrite failed. Wrote %d blocks, expected %d\n", result, blocks);
@@ -318,6 +328,9 @@ DirEntry* loadDirectory(DirEntry* entry){
     }
 
     int blocksNeeded = (entry->size + BLOCK_SIZE -1)/BLOCK_SIZE;
+    if (entry->isDirectory==0){
+        blocksNeeded = FILE_ENTRY_BLOCKS;
+    }
     int bytesNeeded = blocksNeeded*BLOCK_SIZE;
 
     DirEntry* new = malloc(bytesNeeded);
@@ -372,6 +385,28 @@ int fs_setcwd(char* pathname){
 }
 
 int fs_delete(char* filename){
-    printf("The function is not defined yet\n");
+    printf("\n---Remove File---\n");
+    int pathLength = strlen(filename);
+    char path[pathLength];
+    strcpy(path,filename);
+    DirEntry* retParent;
+    retParent = malloc(DIR_BLOCKS*BLOCK_SIZE);
+    int index;
+    char* lastElementName;
+    if (parsePath(path,&retParent,&index,&lastElementName)==-1){
+        printf("error parsing path\n");
+        return -1;
+    }
+    if (index==-1){
+        printf("No such file exists");
+        return -2;
+    }
+    DirEntry fileToRemove = retParent[index];
+    int numBlocksToRelease = FILE_ENTRY_BLOCKS;
+    printf("The size of the file is %d\n",numBlocksToRelease);
+    releaseSpace(fileToRemove.block,numBlocksToRelease);
+    retParent[index].isUsed = 0;
+    writeDir(retParent);
+    FreeDir(retParent);
     return 0;
 }

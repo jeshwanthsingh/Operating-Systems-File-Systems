@@ -38,6 +38,7 @@ typedef u_int32_t uint32_t;
 #endif
 
 #define NUM_OF_ENTRIES 51;
+#define FILE_ENTRY_BLOCKS 1;
 
 
 //Our Directory entry structure

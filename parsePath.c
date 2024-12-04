@@ -15,7 +15,7 @@
 //#include <stdio.h>
 
 // Logging macros for better control
-#define LOG_LEVEL 2 // 0 - No Logs, 1 - Errors only, 2 - Info, 3 - Debug
+#define LOG_LEVEL 3 // 0 - No Logs, 1 - Errors only, 2 - Info, 3 - Debug
 
 #define LOG_ERROR(fmt, ...) if (LOG_LEVEL >= 1) printf("[ERROR] " fmt "\n", ##__VA_ARGS__)
 #define LOG_INFO(fmt, ...) if (LOG_LEVEL >= 2) printf("[INFO] " fmt "\n", ##__VA_ARGS__)
@@ -42,17 +42,11 @@ int parsePath(char* path, DirEntry** returnParent, int* index, char** lastElemen
     LOG_DEBUG("Starting directory: %s (block: %d, size: %d)", 
               current[0].dirName, current[0].block, current[0].size);
 
-    // Handle root directory case
-    if (path[0] == '/' && path[1] == '\0') {
-        *returnParent = current;
-        *lastElementName = NULL;
-        *index = 0;
-        return 0;
-    }
-
     // Tokenize path
     char* savePtr;
-    char* token = strtok_r(path, "/", &savePtr);
+    char* token;
+    char* nextToken;
+    token = strtok_r(path, "/", &savePtr);
     
     // If no token (e.g., "/" path)
     if (token == NULL) {
@@ -64,7 +58,7 @@ int parsePath(char* path, DirEntry** returnParent, int* index, char** lastElemen
 
     // Process path components
     while (1) {
-        char* nextToken = strtok_r(NULL, "/", &savePtr);
+        nextToken = strtok_r(NULL, "/", &savePtr);
         LOG_DEBUG("Processing token: %s, Next token: %s", 
                   token, nextToken ? nextToken : "NULL");
 
@@ -88,7 +82,7 @@ int parsePath(char* path, DirEntry** returnParent, int* index, char** lastElemen
             return -1;
         }
 
-        if (!current[currentIndex].isDirectory) {
+        if (current[currentIndex].isDirectory != 1) {
             LOG_ERROR("%s is not a directory", token);
             return -1;
         }

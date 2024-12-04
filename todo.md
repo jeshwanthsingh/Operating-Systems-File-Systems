@@ -1,4 +1,3 @@
 //ToDO
 
-
-3. sort out writeDir in createDir
+1. Change the number of blocks in FILE_ENTRY_BLOCKS in mfs.h
