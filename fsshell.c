@@ -356,8 +356,61 @@ int cmd_cp (int argcnt, char *argvec[])
 int cmd_mv (int argcnt, char *argvec[])
 	{
 #if (CMDMV_ON == 1)				
-	return -99;
-	// **** TODO ****  For you to implement	
+	// **** TODO ****  For you to implement
+	char *src, *dest;
+    int testfs_src_fd, testfs_dest_fd;
+    int readcnt;
+    char buf[BUFFERLEN];
+
+    // Parse arguments
+    switch (argcnt) {
+        case 2: // Move within the same name (rename functionality)
+            src = argvec[1];
+            dest = argvec[1];
+            break;
+        case 3: // Move to a new location
+            src = argvec[1];
+            dest = argvec[2];
+            break;
+        default:
+            printf("Usage: mv srcfile destfile\n");
+            return -1;
+    }
+
+    // Open source file for reading
+    testfs_src_fd = b_open(src, O_RDONLY);
+    if (testfs_src_fd < 0) {
+        printf("Failed to open source file: %s\n", src);
+        return testfs_src_fd;
+    }
+
+    // Open destination file for writing
+    testfs_dest_fd = b_open(dest, O_WRONLY | O_CREAT | O_TRUNC);
+    if (testfs_dest_fd < 0) {
+        printf("Failed to create destination file: %s\n", dest);
+        b_close(testfs_src_fd);
+        return testfs_dest_fd;
+    }
+
+    // Copy content from source to destination
+    do {
+        readcnt = b_read(testfs_src_fd, buf, BUFFERLEN);
+        if (readcnt > 0) {
+            b_write(testfs_dest_fd, buf, readcnt);
+        }
+    } while (readcnt == BUFFERLEN);
+
+    // Close both files
+    b_close(testfs_src_fd);
+    b_close(testfs_dest_fd);
+
+    // Delete the source file
+    if (fs_delete(src) < 0) {
+        printf("Failed to delete source file: %s\n", src);
+        return -1;
+    }
+
+    return 0; // Success	
 #endif
 	return 0;
 	}

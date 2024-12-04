@@ -408,7 +408,9 @@ int fs_delete(char* filename){
     printf("The size of the file is %d\n",numBlocksToRelease);
     releaseSpace(fileToRemove.block,numBlocksToRelease);
     retParent[index].isUsed = 0;
-    writeDir(retParent);
+    if(writeDir(retParent)!=0){
+        printf("writing directory failed");
+    }
     FreeDir(retParent);
     return 0;
 }
