@@ -17,13 +17,13 @@
 #include <fcntl.h>
 #define B_CHUNK_SIZE 512
 
-typedef int b_io_fd;
+typedef int b_io_fd;        // File descriptor
 
-b_io_fd b_open (char * filename, int flags);
-int b_read (b_io_fd fd, char * buffer, int count);
-int b_write (b_io_fd fd, char * buffer, int count);
-int b_seek (b_io_fd fd, off_t offset, int whence);
-int b_close (b_io_fd fd);
+b_io_fd b_open (char * filename, int flags);  //open file
+int b_read (b_io_fd fd, char * buffer, int count);  //read from file
+int b_write (b_io_fd fd, char * buffer, int count); //write from file
+int b_seek (b_io_fd fd, off_t offset, int whence);  //seek from file
+int b_close (b_io_fd fd);   //close file
 
 #endif
 

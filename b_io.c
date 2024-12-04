@@ -25,8 +25,8 @@
 #include "parsePath.h"
 #include "fsFreespace.h"
 
-#define MAXFCBS 20
-#define B_CHUNK_SIZE 512
+#define MAXFCBS 20      // maximum number of open files
+#define B_CHUNK_SIZE 512   // maximum size of a block
 
 typedef struct b_fcb {
     char buf[B_CHUNK_SIZE];    // Fixed size buffer
@@ -37,13 +37,24 @@ typedef struct b_fcb {
     uint32_t blockIndex;       // Current block number
     int isDirty;              // Buffer needs to be written
     int isUsed;               // FCB is in use
-    int filePosition;
+    int filePosition;       // Current file position
 } b_fcb;
 	
 static b_fcb fcbArray[MAXFCBS];
 static int startup = 0; //Indicates that this has not been initialized
 
-
+/**
+ * b_init
+ * Initializes the file system by resetting all entries in the File Control Block (FCB) array.
+ * 
+ * Behavior:
+ * - Marks all FCB entries as unused.
+ * - Resets buffer-related properties for each FCB.
+ * - Sets the `startup` flag to indicate the file system is initialized.
+ * 
+ * Notes:
+ * - This function is automatically called by `b_open` if the file system has not been initialized.
+ */
 //Method to initialize our file system
 void b_init ()
 	{
@@ -59,6 +70,21 @@ void b_init ()
 	startup = 1;
 	}
 
+/**
+ * b_getFCB
+ * Retrieves a free File Control Block (FCB) from the array of FCBs.
+ * 
+ * Returns:
+ * - Index of the free FCB if available.
+ * - -1 if no free FCB is available.
+ * 
+ * Behavior:
+ * - Iterates through the FCB array to find an unused FCB.
+ * - Marks the FCB as used and resets its properties.
+ * 
+ * Notes:
+ * - This function is not thread-safe, but thread safety is not required for this assignment.
+ */
 //Method to get a free FCB element
 b_io_fd b_getFCB ()
 	{
@@ -79,16 +105,37 @@ b_io_fd b_getFCB ()
 // Interface to open a buffered file
 // Modification of interface for this assignment, flags match the Linux flags for open
 // O_RDONLY, O_WRONLY, or O_RDWR
-b_io_fd b_open(char* filename, int flags) {
-    if (startup == 0) b_init();
+/**
+ * b_open
+ * Opens a file and initializes an FCB for it.
+ * 
+ * Parameters:
+ * - filename: The name of the file to be opened.
+ * - flags: Access mode flags (e.g., O_RDONLY, O_WRONLY, O_RDWR).
+ * 
+ * Returns:
+ * - File descriptor (index of the FCB) on success.
+ * - -1 if an error occurs (e.g., no free FCB, file not found, or path parsing fails).
+ * 
+ * Behavior:
+ * - Allocates an FCB for the file.
+ * - If the file does not exist and O_CREAT is specified, creates the file and initializes its directory entry.
+ * - Populates the FCB with information about the file.
+ * 
+ * Notes:
+ * - Uses `parsePath` to locate the file or its parent directory.
+ * - Handles file creation if the file does not exist.
+ */
+b_io_fd b_open(char* filename, int flags) {     //open file
+    if (startup == 0) b_init();/*initialize if not already done*/   
 
-    b_io_fd fd = b_getFCB();
+    b_io_fd fd = b_getFCB();  // Get free FCB
     if (fd < 0) {
         return -1;  // No free FCB available
     }
 
     // Initialize FCB
-    fcbArray[fd].isUsed = 1;
+    fcbArray[fd].isUsed = 1;        
     fcbArray[fd].index = 0;
     fcbArray[fd].buflen = 0;
     fcbArray[fd].flags = flags;
@@ -100,7 +147,7 @@ b_io_fd b_open(char* filename, int flags) {
     int index;
     char* lastElem;
 
-    if (parsePath(filename, &parent, &index, &lastElem) == -1) {
+    if (parsePath(filename, &parent, &index, &lastElem) == -1) {            //parse the path
         fcbArray[fd].isUsed = 0;  // Path parsing failed
         return -1;
     }
@@ -113,11 +160,11 @@ b_io_fd b_open(char* filename, int flags) {
         }
 
         // Find free entry
-        int newIndex = -1;
-        int numParentEntries = parent[0].size / sizeof(DirEntry);
+        int newIndex = -1;      // Number of entries in the parent directory
+        int numParentEntries = parent[0].size / sizeof(DirEntry);       // Number of entries in the parent directory
 
-        for (int i = 2; i < numParentEntries; i++) {
-            if (!parent[i].isUsed) {
+        for (int i = 2; i < numParentEntries; i++) {        // Number of entries in the parent directory
+            if (!parent[i].isUsed) {        // Directory entry is not used
                 newIndex = i;
                 break;
             }
@@ -167,7 +214,24 @@ b_io_fd b_open(char* filename, int flags) {
     memcpy(&fcbArray[fd].file, &parent[index], sizeof(DirEntry));
     return fd;
 }
-
+/**
+ * b_seek
+ * Adjusts the file position for a file opened in buffered I/O.
+ * 
+ * Parameters:
+ * - fd: File descriptor of the file.
+ * - offset: Byte offset to seek to.
+ * - whence: Reference point for offset (SEEK_SET, SEEK_CUR, SEEK_END).
+ * 
+ * Returns:
+ * - New file position on success.
+ * - -1 if an error occurs (e.g., invalid file descriptor, invalid offset).
+ * 
+ * Behavior:
+ * - Calculates the new position based on `whence`.
+ * - Writes any dirty data in the buffer to disk before moving the position.
+ * - Reads the appropriate block into the buffer.
+ */
 // Interface to seek function	
 int b_seek(b_io_fd fd, off_t offset, int whence) {
     if (!startup || fd < 0 || fd >= MAXFCBS || !fcbArray[fd].isUsed) {
@@ -178,65 +242,84 @@ int b_seek(b_io_fd fd, off_t offset, int whence) {
 
     // Calculate new position
     switch (whence) {
-        case SEEK_SET: newPos = offset; break;
+        case SEEK_SET: newPos = offset; break;      // Set position to offset
         case SEEK_CUR: newPos = fcbArray[fd].blockIndex * B_CHUNK_SIZE + fcbArray[fd].index + offset; break;
-        case SEEK_END: newPos = fcbArray[fd].file.size + offset; break;
+        case SEEK_END: newPos = fcbArray[fd].file.size + offset; break;  // End of file
         default: return -1;
     }
 
-    if (newPos < 0 || newPos > fcbArray[fd].file.size) {
+    if (newPos < 0 || newPos > fcbArray[fd].file.size) {        // Check if new position is valid
         return -1;
     }
 
     // Write current buffer if dirty
-    if (fcbArray[fd].isDirty) {
+    if (fcbArray[fd].isDirty) {         // Write buffer to disk
         LBAwrite(fcbArray[fd].buf, 1, fcbArray[fd].file.block + fcbArray[fd].blockIndex);
-        fcbArray[fd].isDirty = 0;
+        fcbArray[fd].isDirty = 0;       // Reset dirty flag
     }
 
     // Set new position
-    fcbArray[fd].blockIndex = newPos / B_CHUNK_SIZE;
-    fcbArray[fd].index = newPos % B_CHUNK_SIZE;
+    fcbArray[fd].blockIndex = newPos / B_CHUNK_SIZE;        // Calculate block index
+    fcbArray[fd].index = newPos % B_CHUNK_SIZE;     // Calculate index within block
     
     // Load correct block
     if (LBAread(fcbArray[fd].buf, 1, fcbArray[fd].file.block + fcbArray[fd].blockIndex) != 1) {
         return -1;
     }
-    fcbArray[fd].buflen = B_CHUNK_SIZE;
+    fcbArray[fd].buflen = B_CHUNK_SIZE;     // Calculate buffer length
 
     return newPos;
 }
 
 
-
+/**
+ * b_write
+ * Writes data to a file using buffered I/O.
+ * 
+ * Parameters:
+ * - fd: File descriptor of the file.
+ * - buffer: Pointer to the data to be written.
+ * - count: Number of bytes to write.
+ * 
+ * Returns:
+ * - Number of bytes written on success.
+ * - -1 if an error occurs (e.g., invalid file descriptor, disk write failure).
+ * 
+ * Behavior:
+ * - Handles partial writes by reading the block first if necessary.
+ * - Updates the file's size and position after writing.
+ * 
+ * Notes:
+ * - Writes directly to the disk if the buffer is full.
+ */
 // Interface to write function	
-int b_write(b_io_fd fd, char* buffer, int count) {
+int b_write(b_io_fd fd, char* buffer, int count) {          // Buffer to write, number of bytes to write
     if (!startup || fd < 0 || fd >= MAXFCBS || !fcbArray[fd].isUsed) {
         printf("Error: Invalid file descriptor\n");
         return -1;
     }
 
-    int blockNum = fcbArray[fd].file.block + (fcbArray[fd].filePosition / B_CHUNK_SIZE);
-    int offset = fcbArray[fd].filePosition % B_CHUNK_SIZE;
+    int blockNum = fcbArray[fd].file.block + (fcbArray[fd].filePosition / B_CHUNK_SIZE);        // Block number to write to
+    int offset = fcbArray[fd].filePosition % B_CHUNK_SIZE;      // Offset within block
 
     // Write to disk
     if (offset > 0 || count < B_CHUNK_SIZE) {
         // Need to read the block first for partial writes
-        if (LBAread(fcbArray[fd].buf, 1, blockNum) != 1) {
+        if (LBAread(fcbArray[fd].buf, 1, blockNum) != 1) {      // partial write
             printf("Error: Failed to read block for writing\n");
             return -1;
         }
     }
 
-    memcpy(fcbArray[fd].buf + offset, buffer, count);
+    memcpy(fcbArray[fd].buf + offset, buffer, count);       // Copy buffer to FCB buffer
     
-    if (LBAwrite(fcbArray[fd].buf, 1, blockNum) != 1) {
+    if (LBAwrite(fcbArray[fd].buf, 1, blockNum) != 1) {     // Write buffer to disk
         printf("Error: Failed to write to disk\n");
         return -1;
     }
 
-    fcbArray[fd].filePosition += count;
-    if (fcbArray[fd].filePosition > fcbArray[fd].file.size) {
+    fcbArray[fd].filePosition += count;     // Update file position
+    if (fcbArray[fd].filePosition > fcbArray[fd].file.size) {       // Update file size
         fcbArray[fd].file.size = fcbArray[fd].filePosition;
     }
 
@@ -264,30 +347,30 @@ int b_write(b_io_fd fd, char* buffer, int count) {
 //  |             |                                                |        |
 //  | Part1       |  Part 2                                        | Part3  |
 //  +-------------+------------------------------------------------+--------+
-int b_read(b_io_fd fd, char* buffer, int count) {
-    printf("\n--- Reading file: %s ---\n", fcbArray[fd].file.name);
+int b_read(b_io_fd fd, char* buffer, int count) {       // read from file, buffer to read into, number of bytes to read
+    printf("\n--- Reading file: %s ---\n", fcbArray[fd].file.name);     // read from file
     if (!startup || fd < 0 || fd >= MAXFCBS || !fcbArray[fd].isUsed) {
         printf("Error: Invalid file descriptor\n");
         return -1;
     }
 
     // Check read permission
-    if ((fcbArray[fd].flags & O_ACCMODE) == O_WRONLY) {
-        printf("Error: File not opened for reading\n");
+    if ((fcbArray[fd].flags & O_ACCMODE) == O_WRONLY) {     // Check if file is opened for writing
+        printf("Error: File not opened for reading\n");     // File not opened for reading
         return -1;
     }
 
-    printf("Current position: %d, File size: %d\n", 
-           fcbArray[fd].filePosition, fcbArray[fd].file.size);
+    printf("Current position: %d, File size: %d\n",         // Current position and file size
+           fcbArray[fd].filePosition, fcbArray[fd].file.size);      // Current position and file size
 
     // Check if we're at EOF
-    if (fcbArray[fd].filePosition >= fcbArray[fd].file.size) {
+    if (fcbArray[fd].filePosition >= fcbArray[fd].file.size) {      // If we're at EOF
         printf("At end of file\n");
         return 0;
     }
 
     // Calculate how much we can read
-    int remainingBytes = fcbArray[fd].file.size - fcbArray[fd].filePosition;
+    int remainingBytes = fcbArray[fd].file.size - fcbArray[fd].filePosition;        
     int bytesToRead = (count < remainingBytes) ? count : remainingBytes;
 
     printf("Reading %d bytes from block %d\n", 
@@ -315,7 +398,22 @@ int b_read(b_io_fd fd, char* buffer, int count) {
 
 	
 // Interface to Close the file	
-
+/**
+ * b_close
+ * Closes a file and releases its FCB.
+ * 
+ * Parameters:
+ * - fd: File descriptor of the file to be closed.
+ * 
+ * Returns:
+ * - 0 on success.
+ * - -1 if an error occurs (e.g., invalid file descriptor).
+ * 
+ * Behavior:
+ * - Writes any remaining dirty data in the buffer to disk.
+ * - Updates the file size in the parent directory if it has changed.
+ * - Marks the FCB as unused.
+ */
 int b_close(b_io_fd fd) {
     if (!startup || fd < 0 || fd >= MAXFCBS || !fcbArray[fd].isUsed) {
         return -1;
@@ -335,14 +433,15 @@ int b_close(b_io_fd fd) {
         int index;
         char* lastElem;
 
+            // Parse path
         if (parsePath(fcbArray[fd].file.name, &parent, &index, &lastElem) == 0 && index != -1) {
             printf("Updating file size in directory\n");
-            parent[index].size = fcbArray[fd].filePosition;
-            writeDir(parent);
+            parent[index].size = fcbArray[fd].filePosition;     // update file size in directory
+            writeDir(parent);       // update file size in directory
         }
     }
     
-    fcbArray[fd].isUsed = 0;
+    fcbArray[fd].isUsed = 0;        // Free FCB
     printf("File closed successfully\n");
     return 0;
 }

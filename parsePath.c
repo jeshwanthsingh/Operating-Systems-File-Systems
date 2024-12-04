@@ -13,7 +13,38 @@
 
 
 //#include <stdio.h>
-
+/**
+ * parsePath
+ * Parses a given file path and determines its parent directory, the index of the target
+ * entry within the parent directory, and the name of the last component in the path.
+ * 
+ * Parameters:
+ * - path: The file path to be parsed (modifies this string internally).
+ * - returnParent: A pointer to store the parent directory of the target path.
+ * - index: A pointer to store the index of the target entry within the parent directory.
+ * - lastElementName: A pointer to store the name of the last component in the path.
+ * 
+ * Returns:
+ * - 0 on successful parsing.
+ * - -1 if the path is invalid, a directory is not found, or a non-directory is encountered in the path.
+ * 
+ * Behavior:
+ * - Starts parsing from the root directory if the path begins with `/`.
+ * - Otherwise, starts parsing from the current working directory (`cwd`).
+ * - Iterates through each component in the path using `/` as a delimiter.
+ * - Checks for the existence and validity of each component in the path.
+ * - Handles scenarios where the path ends with a file or directory.
+ * 
+ * Logging Levels (controlled by `LOG_LEVEL`):
+ * - [ERROR]: Logs errors such as invalid paths or missing directories.
+ * - [INFO]: Logs high-level information about the parsing process.
+ * - [DEBUG]: Logs detailed information, including token processing and directory transitions.
+ * 
+ * Notes:
+ * - Uses `FindInDirectory` to locate components in the directory.
+ * - Frees the memory of directories that are no longer in use.
+ * - Modifies the input `path` string internally, as it tokenizes the string.
+ */
 // Logging macros for better control
 #define LOG_LEVEL 1 // 0 - No Logs, 1 - Errors only, 2 - Info, 3 - Debug
 

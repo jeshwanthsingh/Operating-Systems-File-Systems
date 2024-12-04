@@ -89,9 +89,9 @@ int findFreeBlocks(int numOfBlocks) {
             if (consecutive == numOfBlocks) {
                 // Mark the blocks as used
                 for (int i = 0; i < numOfBlocks; i++) {
-                    int setBlock = startBlock + i;
-                    int setByteIndex = setBlock / 8;
-                    int setBitIndex = setBlock % 8;
+                    int setBlock = startBlock + i;  // Start of free sequence
+                    int setByteIndex = setBlock / 8;    // Locate the byte
+                    int setBitIndex = setBlock % 8;     // Locate the bit within the byte
                     freeSpaceMap[setByteIndex] |= (1 << (7 - setBitIndex));
                 }
                 return startBlock; // Return the starting block number
@@ -126,10 +126,10 @@ void releaseSpace(int blockNumber, int numBlocks) {
     printf("Released %d blocks starting from block %d.\n", numBlocks, blockNumber);
 }
 
-int checkFree(int blockNumber){
+int checkFree(int blockNumber){     // Check if a block is free
 
-    int byteIndex = blockNumber / 8;
-    int bitIndex = blockNumber % 8;
+    int byteIndex = blockNumber / 8;        // Locate the byte
+    int bitIndex = blockNumber % 8;         // Locate the bit within the byte
 
-    return freeSpaceMap[byteIndex] & (1 << (7-bitIndex));
+    return freeSpaceMap[byteIndex] & (1 << (7-bitIndex));       // Set the bit to 0
 }

@@ -40,8 +40,8 @@
 
 int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize);
 //exit file system
-void exitFileSystem(void);
-static void initRootDirectory(void);
+void exitFileSystem(void);  //exit file system
+static void initRootDirectory(void);    //init root directory
 
 //Global VCB pointer
 //static VCB* vcbPtr = NULL;
@@ -49,45 +49,45 @@ static void initRootDirectory(void);
 DirEntry * cwd = NULL;
 DirEntry * root = NULL;
 
-int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
+int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {   //init file system
    printf("Initializing File System with %ld blocks and block size of %ld bytes\n", 
           numberOfBlocks, blockSize);
 
-   printf("The size of Directory is %lu bytes\n", sizeof(DirEntry));
+   printf("The size of Directory is %lu bytes\n", sizeof(DirEntry));    //size of directory entry
    
    // Allocate and clear VCB
    vcbPtr = (VCB*)malloc(blockSize);
-   if (!vcbPtr) {
+   if (!vcbPtr) {   //if VCB is not allocated
        printf("Failed to allocate VCB\n");
        return -1;
    }
-   memset(vcbPtr, 0, blockSize);
+   memset(vcbPtr, 0, blockSize);    //clear VCB
 
    // Check if the Volume is already Initialized
-   if (LBAread(vcbPtr, 1, VCB_BLOCK) != 1) {
+   if (LBAread(vcbPtr, 1, VCB_BLOCK) != 1) {    //read VCB
        printf("Failed to read block 0\n");
    }
 
    // Check if signature matches
-   if (vcbPtr->signature == MY_SIGNATURE) {
+   if (vcbPtr->signature == MY_SIGNATURE) { //if signature matches
        printf("Signature match found, Volume already initialized\n");
-       loadFreeSpace();
-       root = malloc(DIR_ENTRY_BLOCKS * vcbPtr->blockSize);
-       LBAread(root, DIR_ENTRY_BLOCKS, ROOT_DIR_BLOCK);
-       cwd = root;
+       loadFreeSpace(); //load free space
+       root = malloc(DIR_ENTRY_BLOCKS * vcbPtr->blockSize); //create root directory
+       LBAread(root, DIR_ENTRY_BLOCKS, ROOT_DIR_BLOCK); //read root directory
+       cwd = root;  //current working directory is root
        printf("The name of the root directory is %s \n", root[0].name);
        return 0; // Volume is already initialized
    }
 
    // Initialize VCB
    vcbPtr->signature = MY_SIGNATURE;
-   strncpy(vcbPtr->volumeName, "MyVolume", 31);
-   vcbPtr->totalBlocks = numberOfBlocks;
-   vcbPtr->blockSize = blockSize;
+   strncpy(vcbPtr->volumeName, "MyVolume", 31); //name of volume
+   vcbPtr->totalBlocks = numberOfBlocks;    //total blocks
+   vcbPtr->blockSize = blockSize;   //block size
 
    // Initialize and write the free space bitmap (5 blocks)
    initFreeSpace();
-   vcbPtr->freeSpaceStart = FREE_SPACE_BLOCK;
+   vcbPtr->freeSpaceStart = FREE_SPACE_BLOCK;   //start of free space
    vcbPtr->freeBlocks = numberOfBlocks - 6;  // Subtract VCB, 5 bitmap blocks
 
    // Dynamically request 6 blocks for root directory and update VCB
@@ -106,7 +106,7 @@ int initFileSystem(uint64_t numberOfBlocks, uint64_t blockSize) {
 
    // Write VCB to block 0
    printf("Writing VCB to block %d...\n", VCB_BLOCK);
-   if (LBAwrite(vcbPtr, 1, VCB_BLOCK) != 1) {
+   if (LBAwrite(vcbPtr, 1, VCB_BLOCK) != 1) {   //error
        printf("Error writing VCB\n");
        free(vcbPtr);
        return -1;
@@ -174,11 +174,11 @@ void exitFileSystem() {
    // Write any cached data
    if (vcbPtr) {
        printf("Writing final VCB state...\n");
-       LBAwrite(vcbPtr, 1, VCB_BLOCK);
-       LBAwrite(freeSpaceMap, 5, FREE_SPACE_BLOCK);
-       free(vcbPtr);
-       free(freeSpaceMap);
-       free(root);
+       LBAwrite(vcbPtr, 1, VCB_BLOCK);  // write VCB
+       LBAwrite(freeSpaceMap, 5, FREE_SPACE_BLOCK); // write free space map
+       free(vcbPtr);    // free VCB
+       free(freeSpaceMap);  // free free space map
+       free(root);  // free root directory
        //free(cwd);
        root = NULL;
        cwd = NULL;
